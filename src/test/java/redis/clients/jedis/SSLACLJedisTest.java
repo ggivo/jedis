@@ -1,15 +1,14 @@
 package redis.clients.jedis;
 
+import static io.redis.test.util.TlsUtil.envTruststore;
 import static org.junit.Assert.*;
 
-import java.io.FileInputStream;
-import java.io.InputStream;
 import java.security.InvalidAlgorithmParameterException;
-import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import javax.net.ssl.*;
 
+import io.redis.test.util.TlsUtil;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -28,8 +27,8 @@ public class SSLACLJedisTest {
 
   @BeforeClass
   public static void prepare() {
-    // We need to set up certificates first before connecting to the endpoint with enabled TLS
-    SSLJedisTest.setupTrustStore();
+    TlsUtil.createAndSaveEnvTruststore("redis1-5", "changeit");
+    TlsUtil.setJvmTrustStore(envTruststore("redis1-5"));
     // Use to check if the ACL test should be ran. ACL are available only in 6.0 and later
     org.junit.Assume.assumeTrue("Not running ACL test on this version of Redis",
         RedisVersionUtil.checkRedisMajorVersionNumber(6, endpoint));
@@ -77,24 +76,6 @@ public class SSLACLJedisTest {
     }
   }
 
-  /**
-   * Creates an SSLSocketFactory that trusts all certificates in truststore.jceks.
-   */
-  static SSLSocketFactory createTrustStoreSslSocketFactory() throws Exception {
-
-    KeyStore trustStore = KeyStore.getInstance("jceks");
-    try (InputStream inputStream = new FileInputStream("src/test/resources/truststore.jceks")) {
-      trustStore.load(inputStream, null);
-    }
-
-    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX");
-    trustManagerFactory.init(trustStore);
-    TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
-
-    SSLContext sslContext = SSLContext.getInstance("TLS");
-    sslContext.init(null, trustManagers, new SecureRandom());
-    return sslContext.getSocketFactory();
-  }
 
   /**
    * Creates an SSLSocketFactory with a trust manager that does not trust any certificates.

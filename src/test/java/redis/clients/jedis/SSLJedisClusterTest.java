@@ -1,5 +1,7 @@
 package redis.clients.jedis;
 
+import static io.redis.test.util.TlsUtil.envCa;
+import static io.redis.test.util.TlsUtil.envTruststore;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -7,15 +9,14 @@ import java.util.Collections;
 import java.util.Map;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLParameters;
-import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocketFactory;
 
+import io.redis.test.util.TlsUtil;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import redis.clients.jedis.exceptions.JedisClusterOperationException;
-import redis.clients.jedis.SSLJedisTest.BasicHostnameVerifier;
 
 public class SSLJedisClusterTest extends JedisClusterTestBase {
 
@@ -27,7 +28,7 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
     int port = hostAndPort.getPort();
     if (host.equals("127.0.0.1")) {
       host = "localhost";
-      port = port + 1000;
+      //port = port + 1000;
     }
     return new HostAndPort(host, port);
   };
@@ -37,12 +38,16 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
     if ("localhost".equals(hostAndPort.getHost())) {
       return hostAndPort;
     }
-    return new HostAndPort(hostAndPort.getHost(), hostAndPort.getPort() + 1000);
+    //return new HostAndPort(hostAndPort.getHost(), hostAndPort.getPort() + 1000);
+    return new HostAndPort(hostAndPort.getHost(), hostAndPort.getPort() );
   };
 
   @BeforeClass
   public static void prepare() {
-    SSLJedisTest.setupTrustStore(); // set up trust store for SSL tests
+    // TODO(igaydajiev) : JVM truststore should be configured only for tests
+    //  using jvm trust store to avoid wrong trust store usage in case of custom one
+    TlsUtil.createAndSaveEnvTruststore("cluster-unbound", "changeit");
+    TlsUtil.setJvmTrustStore(envTruststore("cluster-unbound"));
   }
 
   @Test
@@ -53,9 +58,9 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
 //      Map<String, JedisPool> clusterNodes = jc.getClusterNodes();
       Map<String, ?> clusterNodes = jc.getClusterNodes();
       assertEquals(3, clusterNodes.size());
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7379"));
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7380"));
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7381"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8379"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8380"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8381"));
 
       jc.get("foo");
     }
@@ -66,9 +71,9 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
 //      Map<String, JedisPool> clusterNodes = jc2.getClusterNodes();
       Map<String, ?> clusterNodes = jc2.getClusterNodes();
       assertEquals(3, clusterNodes.size());
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7379"));
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7380"));
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7381"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8379"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8380"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8381"));
       jc2.get("foo");
     }
   }
@@ -81,15 +86,15 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
 //      Map<String, JedisPool> clusterNodes = jc.getClusterNodes();
       Map<String, ?> clusterNodes = jc.getClusterNodes();
       assertEquals(3, clusterNodes.size());
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7379"));
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7380"));
-      assertTrue(clusterNodes.containsKey("127.0.0.1:7381"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8379"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8380"));
+      assertTrue(clusterNodes.containsKey("127.0.0.1:8381"));
     }
   }
 
   @Test
   public void connectByIpAddress() {
-    try (JedisCluster jc = new JedisCluster(new HostAndPort("127.0.0.1", 7379),
+    try (JedisCluster jc = new JedisCluster(new HostAndPort("127.0.0.1", 8379),
         DefaultJedisClientConfig.builder().password("cluster").ssl(true)
             .hostAndPortMapper(hostAndPortMap).build(),
         DEFAULT_REDIRECTIONS, DEFAULT_POOL_CONFIG)) {
@@ -149,8 +154,8 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
 
   @Test
   public void connectWithCustomHostNameVerifier() {
-    HostnameVerifier hostnameVerifier = new BasicHostnameVerifier();
-    HostnameVerifier localhostVerifier = new LocalhostVerifier();
+    HostnameVerifier hostnameVerifier = new TlsUtil.BasicHostnameVerifier();
+    HostnameVerifier localhostVerifier = new TlsUtil.LocalhostVerifier();
 
     try (JedisCluster jc = new JedisCluster(new HostAndPort("localhost", 8379),
         DefaultJedisClientConfig.builder().password("cluster").ssl(true)
@@ -189,7 +194,8 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
 
   @Test
   public void connectWithCustomSocketFactory() throws Exception {
-    final SSLSocketFactory sslSocketFactory = SSLJedisTest.createTrustStoreSslSocketFactory();
+
+    final SSLSocketFactory sslSocketFactory = TlsUtil.createTrustStoreSslSocketFactory(envCa("cluster-unbound"));
 
     try (JedisCluster jc = new JedisCluster(new HostAndPort("localhost", 8379),
         DefaultJedisClientConfig.builder().password("cluster").ssl(true)
@@ -201,7 +207,7 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
 
   @Test
   public void connectWithEmptyTrustStore() throws Exception {
-    final SSLSocketFactory sslSocketFactory = SSLJedisTest.createTrustNoOneSslSocketFactory();
+    final SSLSocketFactory sslSocketFactory = TlsUtil.createTrustNoOneSslSocketFactory();
 
     try (JedisCluster jc = new JedisCluster(new HostAndPort("localhost", 8379),
         DefaultJedisClientConfig.builder().password("cluster").ssl(true)
@@ -229,16 +235,6 @@ public class SSLJedisClusterTest extends JedisClusterTestBase {
       assertTrue(clusterNodes.containsKey("127.0.0.1:7379"));
       assertTrue(clusterNodes.containsKey("127.0.0.1:7380"));
       assertTrue(clusterNodes.containsKey("127.0.0.1:7381"));
-    }
-  }
-
-  public class LocalhostVerifier extends BasicHostnameVerifier {
-    @Override
-    public boolean verify(String hostname, SSLSession session) {
-      if (hostname.equals("127.0.0.1")) {
-        hostname = "localhost";
-      }
-      return super.verify(hostname, session);
     }
   }
 }

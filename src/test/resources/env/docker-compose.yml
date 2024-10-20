@@ -1,0 +1,209 @@
+services:
+  redis1-5:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis1-5
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+      - REDIS_PASSWORD=foobared
+      - TLS_ENABLED=yes
+    ports:
+      - "6379:6379"
+      - "6383:6383"
+      - "6390:6390"
+      - "6391:6391"
+    volumes:
+      - "./redis1-5/config:/redis/config"
+      - "${WORK_DIR}/redis1-5/work:/redis/work"
+
+  redis2:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis2
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+      - REDIS_PASSWORD=foobared
+      - PORT=6380
+    ports:
+      - "6380:6380"
+    volumes:
+      - "${WORK_DIR}/work/redis2/work:/redis/work"
+
+  redis3-4:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis3-4
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+      - TLS_ENABLED=yes
+      - REDIS_PASSWORD=foobared
+    ports:
+      - "6381-6382:6381-6382"
+      - "16381-16382:16381-16382"
+    volumes:
+      - "./redis3-4/config:/redis/config"
+      - "${WORK_DIR}/redis3-4/work:/redis/work"
+
+  redis6-7:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis6-7
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+      - REDIS_PASSWORD=foobared
+    ports:
+      - "6384:6384"
+      - "6385:6385"
+    volumes:
+      - "./redis6-7/config:/redis/config"
+      - "${WORK_DIR}/redis6-7/work:/redis/work"
+  redis8:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis8
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+      - PORT=6386
+    command:
+      - --maxmemory-policy allkeys-lfu
+    ports:
+      - "6386:6386"
+    volumes:
+      - "${WORK_DIR}/redis8/work:/redis/work"
+
+  redis9:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis9
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+      - REDIS_CLIENT_USER=acljedis
+      - REDIS_CLIENT_PASSWORD=fizzbuzz
+      - TLS_ENABLED=yes
+    ports:
+      - "6387:6387"
+      - "16387:16387"
+    volumes:
+      - "./redis9/config:/redis/config"
+      - "${WORK_DIR}/redis9/work:/redis/work"
+
+  redis10-11:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis10-11
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+    ports:
+      - "6388:6388"
+      - "6389:6389"
+    volumes:
+      - "./redis10-11/config:/redis/config"
+      - "${WORK_DIR}/redis10-11/work:/redis/work"
+  redis-unavailable:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: redis-unavailable-1
+    #network_mode: host
+    environment:
+      - REDIS_CLUSTER=no
+      - PORT=6400
+    ports:
+      - "6400:6400"
+    volumes:
+      - "${WORK_DIR}/redis-unavailable/work:/redis/work"
+  cluster-unbound:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: cluster-unbound-1
+    environment:
+      - TLS_ENABLED=yes
+      - REDIS_PASSWORD=cluster
+    ports:
+      - "7379-7383:7379-7383"
+      - "8379-8383:8379-8383"
+    volumes:
+      - "./cluster-unbound/config:/redis/config"
+      - "${WORK_DIR}/cluster-unbound/work:/redis/work"
+  cluster-stable:
+    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
+    container_name: cluster-stable-1
+    #network_mode: host
+    environment:
+      - REDIS_PASSWORD=cluster
+      - PORT=7479
+      - NODES=3
+      - REPLICAS=0
+    ports:
+      - "7479-7481:7479-7481"
+    volumes:
+      - "./cluster-stable/config:/redis/config"
+      - "${WORK_DIR}/cluster-stable/work:/redis/work"
+  #todo: migrate to CE image & test all modules test passed
+  jedis-stack:
+      image: redis/redis-stack-server:edge
+      container_name: jedis-stack
+      ports:
+        - "6479:6379"
+  sentinel1:
+    image: ${REDIS_IMAGE:-redis:latest}
+    container_name: redis-sentinel1
+    #network_mode: host
+    depends_on:
+      - redis1-5
+    entrypoint: "redis-sentinel /redis.conf --port 26379"
+    ports:
+      - 26379:26379
+    volumes:
+      - "./sentinel/sentinel1.conf:/redis.conf"
+  sentinel2:
+    image: ${REDIS_IMAGE:-redis:latest}
+    container_name: redis-sentinel2
+    #network_mode: host
+    depends_on:
+      - redis3-4
+    entrypoint: "redis-sentinel /redis.conf --port 26380"
+    ports:
+      - 26380:26380
+    volumes:
+      - "./sentinel/sentinel2.conf:/redis.conf"
+  sentinel3:
+    image: ${REDIS_IMAGE:-redis:latest}
+    container_name: redis-sentinel3
+    #network_mode: host
+    depends_on:
+      - redis6-7
+    entrypoint: "redis-sentinel /redis.conf --port 26381"
+    ports:
+      - 26381:26381
+    volumes:
+      - "./sentinel/sentinel3.conf:/redis.conf"
+  sentinel4:
+    image: ${REDIS_IMAGE:-redis:latest}
+    container_name: redis-sentinel4
+    #network_mode: host
+    depends_on:
+      - redis3-4
+    entrypoint: "redis-sentinel /redis.conf --port 26382"
+    ports:
+      - 26382:26382
+    volumes:
+      - "./sentinel/sentinel4.conf:/redis.conf"
+  sentinel5:
+    image: ${REDIS_IMAGE:-redis:latest}
+    container_name: redis-sentinel5
+    #network_mode: host
+    depends_on:
+      - redis9
+    entrypoint: "redis-sentinel /redis.conf --port 26383"
+    ports:
+      - 26383:26383
+    volumes:
+      - "./sentinel/sentinel5.conf:/redis.conf"
+
+#todo find a way to connect from mac os host to exposed unix socket in container
+#  redis_uds:
+#    image: redis:8.0-M01
+#    container_name: redis_uds
+#    #network_mode: host
+#    command: redis-server /etc/redis.conf
+#    volumes:
+#      - "./redis_uds/config/node-0/redis.conf:/etc/redis.conf"
+#      - "./work/redis_uds/work:/tmp/docker/"

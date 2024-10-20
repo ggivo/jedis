@@ -305,7 +305,7 @@ public class AccessControlListCommandsTest extends JedisCommandsTestBase {
     }
 
     // allow user to access a subset of the key
-    jedis.aclSetUser(USER_NAME, "allcommands", "~foo:*", "~bar:*"); // TODO : Define a DSL
+    jedis.aclSetUser(USER_NAME, "allcommands", "~foo:*", "~bar:*"); // TODO : a DSL
 
     // create key foo, bar and zap
     jedis2.set("foo:1", "a");

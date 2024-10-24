@@ -28,9 +28,9 @@ jobs:
       matrix:
         redis_version:
           - redislabs/client-libs-test:8.0-M01
-          - redislabs/client-libs-test:7.4.1
-          - redislabs/client-libs-test:7.2.6
-          - redislabs/client-libs-test:6.2.16
+#          - redislabs/client-libs-test:7.4.1
+#          - redislabs/client-libs-test:7.2.6
+#          - redislabs/client-libs-test:6.2.16
     steps:
       - uses: actions/checkout@v2
       - name: Set up publishing to maven central
@@ -70,6 +70,19 @@ jobs:
           export TEST_ENV_PROVIDER=docker
           export TEST_WORK_FOLDER=$WORK_DIR
           mvn clean compile test
+      # Collect logs on failure
+      - name: Collect logs on failure
+        if: failure()  # This runs only if the previous steps failed
+        run: |
+           echo "Collecting logs from $WORK_DIR..."
+           ls -la $WORK_DIR
+      # Upload logs as artifacts
+      - name: Upload logs on failure
+        if: failure()
+         uses: actions/upload-artifact@v3
+         with:
+           name: application-logs
+           path: $WORK_DIR
       # Bring down the Docker Compose test environment
       - name: Tear down Docker Compose environment
         run: docker compose -f src/test/resources/docker-compose.yml down

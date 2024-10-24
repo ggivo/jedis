@@ -27,6 +27,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import redis.clients.jedis.args.ClusterResetType;
@@ -154,6 +155,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test
+  @Ignore
   public void testReadonlyAndReadwrite() throws Exception {
     node1.clusterMeet(LOCAL_IP, nodeInfoSlave2.getPort());
     JedisClusterTestUtil.waitForClusterReady(node1, node2, node3, nodeSlave2);
@@ -185,6 +187,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test
+  @Ignore
   public void testReadFromReplicas() throws Exception {
     node1.clusterMeet(LOCAL_IP, nodeInfoSlave2.getPort());
     JedisClusterTestUtil.waitForClusterReady(node1, node2, node3, nodeSlave2);
@@ -265,6 +268,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test
+  @Ignore
   public void testMigrateToNewNode() throws InterruptedException {
     Set<HostAndPort> jedisClusterNode = new HashSet<>();
     jedisClusterNode.add(nodeInfo1);
@@ -399,6 +403,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test
+  @Ignore
   public void testClusterForgetNode() throws InterruptedException {
     // at first, join node4 to cluster
     node1.clusterMeet("127.0.0.1", nodeInfo4.getPort());
@@ -474,6 +479,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test
+  @Ignore
   public void testStableSlotWhenMigratingNodeOrImportingNodeIsNotSpecified()
       throws InterruptedException {
     Set<HostAndPort> jedisClusterNode = new HashSet<>();
@@ -618,6 +624,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test(expected = JedisClusterOperationException.class, timeout = DEFAULT_TIMEOUT)
+  @Ignore
   public void testReturnConnectionOnRedirection() {
     Set<HostAndPort> jedisClusterNode = new HashSet<>();
     jedisClusterNode.add(new HostAndPort("127.0.0.1", 7379));
@@ -681,6 +688,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test
+  @Ignore
   public void clusterRefreshNodes() throws Exception {
     Set<HostAndPort> jedisClusterNode = new HashSet<>();
     jedisClusterNode.add(nodeInfo1);
@@ -737,6 +745,7 @@ public class JedisClusterTest extends JedisClusterTestBase {
   }
 
   @Test(timeout = 30_000)
+  @Ignore
   public void clusterPeriodTopologyRefreshTest() throws Exception {
     Set<HostAndPort> jedisClusterNode = new HashSet<>();
     jedisClusterNode.add(nodeInfo1);

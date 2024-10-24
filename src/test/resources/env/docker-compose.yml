@@ -9,26 +9,14 @@ services:
       - TLS_ENABLED=yes
     ports:
       - "6379:6379"
+      - "6380:6380"
       - "6383:6383"
+      - "6386:6386"
       - "6390:6390"
       - "6391:6391"
     volumes:
       - "./redis1-5/config:/redis/config"
       - "${WORK_DIR}/redis1-5/work:/redis/work"
-
-  redis2:
-    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
-    container_name: redis2
-    #network_mode: host
-    environment:
-      - REDIS_CLUSTER=no
-      - REDIS_PASSWORD=foobared
-      - PORT=6380
-    ports:
-      - "6380:6380"
-    volumes:
-      - "${WORK_DIR}/work/redis2/work:/redis/work"
-
   redis3-4:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: redis3-4
@@ -57,20 +45,6 @@ services:
     volumes:
       - "./redis6-7/config:/redis/config"
       - "${WORK_DIR}/redis6-7/work:/redis/work"
-  redis8:
-    image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
-    container_name: redis8
-    #network_mode: host
-    environment:
-      - REDIS_CLUSTER=no
-      - PORT=6386
-    command:
-      - --maxmemory-policy allkeys-lfu
-    ports:
-      - "6386:6386"
-    volumes:
-      - "${WORK_DIR}/redis8/work:/redis/work"
-
   redis9:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: redis9
@@ -126,6 +100,7 @@ services:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: cluster-stable-1
     #network_mode: host
+    command: --cluster-announce-ip 127.0.0.1
     environment:
       - REDIS_PASSWORD=cluster
       - PORT=7479

@@ -224,7 +224,7 @@ public class ClusterCommandsTest {
         assertNotNull(nodeInfo.getIp());
         assertNull(nodeInfo.getHostname());
         assertNotNull(nodeInfo.getPort());
-        assertNull(nodeInfo.getTlsPort());
+        assertNotNull(nodeInfo.getTlsPort());
         assertNotNull(nodeInfo.getRole());
         assertNotNull(nodeInfo.getReplicationOffset());
         assertNotNull(nodeInfo.getHealth());

@@ -76,14 +76,14 @@ jobs:
         if: failure()  # This runs only if the previous steps failed
         run: |
            echo "Collecting logs from $WORK_DIR..."
-           ls -la $TEST_WORK_FOLDER
+           ls -la ./work
       # Upload logs as artifacts
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v3
         with:
            name: redis-env-work-logs
-           path: $TEST_WORK_FOLDER
+           path: ./work
       # Bring down the Docker Compose test environment
       - name: Tear down Docker Compose environment
         run: docker compose -f src/test/resources/docker-compose.yml down

@@ -1,0 +1,83 @@
+---
+
+name: Build and Test using containerized environment
+
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '**/*.rst'
+    branches:
+      - master
+      - '[0-9].*'
+  pull_request:
+    branches:
+      - master
+      - '[0-9].*'
+  schedule:
+    - cron: '0 1 * * *' # nightly build
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        redis_version:
+          - redislabs/client-libs-test:8.0-M01
+          - redislabs/client-libs-test:7.4.1
+          - redislabs/client-libs-test:7.2.6
+          - redislabs/client-libs-test:6.2.16
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up publishing to maven central
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+      - name: System setup
+        run: |
+          sudo apt update
+          sudo apt install -y make
+          make compile-module
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.m2/repository
+            /var/cache/apt
+          key: jedis-${{hashFiles('**/pom.xml')}}
+      - name: Maven offline
+        run: |
+          mvn -q dependency:go-offline
+      - name: Build docs
+        run: |
+          mvn javadoc:jar
+      # Set up Docker Compose environment
+      - name: Set up Docker Compose environment
+        run: |
+            CLIENT_LIBS_TEST_IMAGE=${{ matrix.redis_version }} docker-compose -f src/test/resources/docker-compose.yml up -d
+      - name: Wait for services to be ready
+        run: sleep 10
+      # Run Tests
+      - name: Run Maven tests
+        run: mvn clean compile test
+      # Bring down the Docker Compose test environment
+      - name: Tear down Docker Compose environment
+        run: docker-compose -f src/test/resources/docker-compose.yml down
+      # Upload code coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload test results to Codecov
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'push') || github.event_name == 'workflow_dispatch'}}
+        uses: codecov/test-results-action@v1
+        with:
+          fail_ci_if_error: false
+          files: ./target/surefire-reports/TEST*
+          token: ${{ secrets.CODECOV_TOKEN }}

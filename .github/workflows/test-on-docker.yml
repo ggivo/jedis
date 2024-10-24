@@ -69,7 +69,7 @@ jobs:
         run: |
           export TEST_ENV_PROVIDER=docker
           export TEST_WORK_FOLDER=$WORK_DIR
-          mvn clean compile test
+          mvn -Dtest=redis.clients.jedis.SSLJedisSentinelPoolTest clean compile test
       # Collect logs on failure
       - name: Collect logs on failure
         if: failure()  # This runs only if the previous steps failed

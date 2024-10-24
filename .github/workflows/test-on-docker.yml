@@ -59,12 +59,17 @@ jobs:
       # Set up Docker Compose environment
       - name: Set up Docker Compose environment
         run: |
-          WORK_DIR=${{ github.workspace }}/work CLIENT_LIBS_TEST_IMAGE=${{ matrix.redis_version }} docker compose -f src/test/resources/env/docker-compose.yml up -d
+          export WORK_DIR=${{ github.workspace }}/work
+          export CLIENT_LIBS_TEST_IMAGE=${{ matrix.redis_version }}
+          docker compose -f src/test/resources/env/docker-compose.yml up -d
       - name: Wait for services to be ready
         run: sleep 10
       # Run Tests
       - name: Run Maven tests
-        run: mvn clean compile test
+        run: |
+          export TEST_ENV_PROVIDER=docker
+          export TEST_WORK_FOLDER=$WORK_DIR
+          mvn clean compile test
       # Bring down the Docker Compose test environment
       - name: Tear down Docker Compose environment
         run: docker compose -f src/test/resources/docker-compose.yml down

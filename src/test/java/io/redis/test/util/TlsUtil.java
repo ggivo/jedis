@@ -19,7 +19,7 @@ public class TlsUtil {
     private static final String TEST_WORK_FOLDER = System.getenv().getOrDefault("TEST_WORK_FOLDER", "./redis-env/");
     private static final String TEST_TRUSTSTORE = System.getenv().getOrDefault("TEST_TRUSTSTORE", "work/tls/truststore.jceks");
     private static final String TEST_CA_CERT = System.getenv().getOrDefault("TEST_CA_CERT", "work/tls/ca.crt");
-    private static final String TEST_ENV_PROVIDER = System.getenv().getOrDefault("TEST_ENV_PROVIDERw", "docker");
+    private static final String TEST_ENV_PROVIDER = System.getenv().getOrDefault("TEST_ENV_PROVIDER", "docker");
 
     private static boolean isDockerEnv() {
         return TEST_ENV_PROVIDER.equals("docker");

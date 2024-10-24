@@ -59,7 +59,7 @@ jobs:
       # Set up Docker Compose environment
       - name: Set up Docker Compose environment
         run: |
-            CLIENT_LIBS_TEST_IMAGE=${{ matrix.redis_version }} docker-compose -f src/test/resources/docker-compose.yml up -d
+            CLIENT_LIBS_TEST_IMAGE=${{ matrix.redis_version }} docker compose -f src/test/resources/docker-compose.yml up -d
       - name: Wait for services to be ready
         run: sleep 10
       # Run Tests
@@ -67,7 +67,7 @@ jobs:
         run: mvn clean compile test
       # Bring down the Docker Compose test environment
       - name: Tear down Docker Compose environment
-        run: docker-compose -f src/test/resources/docker-compose.yml down
+        run: docker compose -f src/test/resources/docker-compose.yml down
       # Upload code coverage
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

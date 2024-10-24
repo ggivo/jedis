@@ -1,14 +1,17 @@
 package redis.clients.jedis;
 
-import static io.redis.test.util.TlsUtil.envTruststore;
+import static redis.clients.jedis.util.TlsUtil.envTruststore;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import io.redis.test.util.TlsUtil;
+import org.junit.AfterClass;
+import redis.clients.jedis.util.TlsUtil;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.file.Path;
 
 public class SSLJedisTest {
     static Logger log = LoggerFactory.getLogger(SSLJedisTest.class);
@@ -16,10 +19,14 @@ public class SSLJedisTest {
 
     @BeforeClass
     public static void prepare() {
-        TlsUtil.createAndSaveEnvTruststore("redis1-5", "changeit");
-        TlsUtil.setJvmTrustStore(envTruststore("redis1-5"));
+        Path trusStorePath = TlsUtil.createAndSaveEnvTruststore("redis1-2-5-10-sentinel", "changeit");
+        TlsUtil.setCustomTrustStore(trusStorePath, "changeit");
     }
 
+    @AfterClass
+    public static void teardownTrustStore() {
+        TlsUtil.restoreOriginalTrustStore();
+    }
 
     @Test
     public void connectWithSsl() {

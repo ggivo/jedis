@@ -38,6 +38,10 @@ public class AccessControlLogEntry implements Serializable {
   private final long timestampCreated;
   private final long timestampLastUpdated;
 
+  /*
+   * Starting with Redis version 7.2.0: Added entry ID, timestamp created, and timestamp last updated.
+   * @see https://redis.io/docs/latest/commands/acl-log/
+   */
   public AccessControlLogEntry(Map<String, Object> map) {
     count = (long) map.get(COUNT);
     reason = (String) map.get(REASON);
@@ -47,9 +51,9 @@ public class AccessControlLogEntry implements Serializable {
     ageSeconds = (Double) map.get(AGE_SECONDS);
     clientInfo = getMapFromRawClientInfo((String) map.get(CLIENT_INFO));
     logEntry = map;
-    entryId = (long) map.get(ENTRY_ID);
-    timestampCreated = (long) map.get(TIMESTAMP_CREATED);
-    timestampLastUpdated = (long) map.get(TIMESTAMP_LAST_UPDATED);
+    entryId = map.get(ENTRY_ID) == null ? 0L : (long) map.get(ENTRY_ID);
+    timestampCreated = map.get(TIMESTAMP_CREATED) == null ? 0L : (long) map.get(TIMESTAMP_CREATED);
+    timestampLastUpdated = map.get(TIMESTAMP_LAST_UPDATED) == null ? 0L : (long) map.get(TIMESTAMP_LAST_UPDATED);
   }
 
   public long getCount() {

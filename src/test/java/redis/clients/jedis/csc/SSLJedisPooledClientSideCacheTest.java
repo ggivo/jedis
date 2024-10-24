@@ -1,20 +1,35 @@
 package redis.clients.jedis.csc;
 
-import io.redis.test.util.TlsUtil;
+import org.junit.AfterClass;
+
+import redis.clients.jedis.Jedis;
+import io.redis.test.utils.RedisVersion;
+import redis.clients.jedis.util.TlsUtil;
 import org.junit.BeforeClass;
 import redis.clients.jedis.HostAndPorts;
-import redis.clients.jedis.SSLJedisTest;
 
-import static io.redis.test.util.TlsUtil.envTruststore;
+import java.nio.file.Path;
+
+import static org.junit.Assume.assumeTrue;
+import static io.redis.test.utils.RedisVersionUtil.getRedisVersion;
 
 public class SSLJedisPooledClientSideCacheTest extends JedisPooledClientSideCacheTestBase {
 
   @BeforeClass
   public static void prepare() {
-    TlsUtil.createAndSaveEnvTruststore("redis1-5", "changeit");
-    TlsUtil.setJvmTrustStore(envTruststore("redis1-5"));
+    Path trusStorePath = TlsUtil.createAndSaveEnvTruststore("redis1-2-5-10-sentinel", "changeit");
+    TlsUtil.setCustomTrustStore(trusStorePath, "changeit");
 
     endpoint = HostAndPorts.getRedisEndpoint("standalone0-tls");
+
+    try (Jedis jedis = new Jedis(endpoint.getHostAndPort(), endpoint.getClientConfigBuilder().build())) {
+      assumeTrue("Jedis Client side caching is only supported with 'Redis 7.4' or later.",
+              getRedisVersion(jedis).isGreaterThanOrEqualTo(RedisVersion.V7_4));
+    }
   }
 
+  @AfterClass
+  public static void teardownTrustStore() {
+    TlsUtil.restoreOriginalTrustStore();
+  }
 }

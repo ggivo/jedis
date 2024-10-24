@@ -24,6 +24,8 @@ jobs:
   build:
     name: Build and Test
     runs-on: ubuntu-latest
+    env:
+      REDIS_ENV_WORK_DIR: ${{ github.workspace }}/work
     strategy:
       matrix:
         redis_version:
@@ -59,7 +61,7 @@ jobs:
       # Set up Docker Compose environment
       - name: Set up Docker Compose environment
         run: |
-          export WORK_DIR="${{ github.workspace }}/work"
+          export WORK_DIR=$REDIS_ENV_WORK_DIR
           export CLIENT_LIBS_TEST_IMAGE=${{ matrix.redis_version }}
           docker compose -f src/test/resources/env/docker-compose.yml up -d
       - name: Wait for services to be ready
@@ -68,7 +70,7 @@ jobs:
       - name: Run Maven tests
         run: |
           export TEST_ENV_PROVIDER=docker
-          export TEST_WORK_FOLDER=$WORK_DIR
+          export TEST_WORK_FOLDER=$REDIS_ENV_WORK_DIR
           echo $TEST_WORK_FOLDER
           mvn -Dtest=redis.clients.jedis.SSLJedisSentinelPoolTest clean compile test
       # Collect logs on failure

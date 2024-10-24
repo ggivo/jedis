@@ -59,7 +59,7 @@ jobs:
       # Set up Docker Compose environment
       - name: Set up Docker Compose environment
         run: |
-          export WORK_DIR=${{ github.workspace }}/work
+          export WORK_DIR="${{ github.workspace }}/work"
           export CLIENT_LIBS_TEST_IMAGE=${{ matrix.redis_version }}
           docker compose -f src/test/resources/env/docker-compose.yml up -d
       - name: Wait for services to be ready
@@ -69,20 +69,21 @@ jobs:
         run: |
           export TEST_ENV_PROVIDER=docker
           export TEST_WORK_FOLDER=$WORK_DIR
+          echo $TEST_WORK_FOLDER
           mvn -Dtest=redis.clients.jedis.SSLJedisSentinelPoolTest clean compile test
       # Collect logs on failure
       - name: Collect logs on failure
         if: failure()  # This runs only if the previous steps failed
         run: |
            echo "Collecting logs from $WORK_DIR..."
-           ls -la $WORK_DIR
+           ls -la $TEST_WORK_FOLDER
       # Upload logs as artifacts
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v3
         with:
            name: redis-env-work-logs
-           path: $WORK_DIR
+           path: $TEST_WORK_FOLDER
       # Bring down the Docker Compose test environment
       - name: Tear down Docker Compose environment
         run: docker compose -f src/test/resources/docker-compose.yml down

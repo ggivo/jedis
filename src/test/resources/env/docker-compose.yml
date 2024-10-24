@@ -16,7 +16,7 @@ services:
       - "6391:6391"
     volumes:
       - "./redis1-5/config:/redis/config"
-      - "${WORK_DIR}/redis1-5/work:/redis/work"
+      - "${WORK_DIR}/redis1-5/work:/redis/work:rw"
   redis3-4:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: redis3-4
@@ -30,7 +30,7 @@ services:
       - "16381-16382:16381-16382"
     volumes:
       - "./redis3-4/config:/redis/config"
-      - "${WORK_DIR}/redis3-4/work:/redis/work"
+      - "${WORK_DIR}/redis3-4/work:/redis/work:rw"
 
   redis6-7:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
@@ -44,7 +44,7 @@ services:
       - "6385:6385"
     volumes:
       - "./redis6-7/config:/redis/config"
-      - "${WORK_DIR}/redis6-7/work:/redis/work"
+      - "${WORK_DIR}/redis6-7/work:/redis/work:rw"
   redis9:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: redis9
@@ -59,7 +59,7 @@ services:
       - "16387:16387"
     volumes:
       - "./redis9/config:/redis/config"
-      - "${WORK_DIR}/redis9/work:/redis/work"
+      - "${WORK_DIR}/redis9/work:/redis/work:rw"
 
   redis10-11:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
@@ -72,7 +72,7 @@ services:
       - "6389:6389"
     volumes:
       - "./redis10-11/config:/redis/config"
-      - "${WORK_DIR}/redis10-11/work:/redis/work"
+      - "${WORK_DIR}/redis10-11/work:/redis/work:rw"
   redis-unavailable:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: redis-unavailable-1
@@ -83,7 +83,7 @@ services:
     ports:
       - "6400:6400"
     volumes:
-      - "${WORK_DIR}/redis-unavailable/work:/redis/work"
+      - "${WORK_DIR}/redis-unavailable/work:/redis/work:rw"
   cluster-unbound:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: cluster-unbound-1
@@ -95,7 +95,7 @@ services:
       - "8379-8383:8379-8383"
     volumes:
       - "./cluster-unbound/config:/redis/config"
-      - "${WORK_DIR}/cluster-unbound/work:/redis/work"
+      - "${WORK_DIR}/cluster-unbound/work:/redis/work:rw"
   cluster-stable:
     image: ${CLIENT_LIBS_TEST_IMAGE:-redislabs/client-libs-test:8.0-M01}
     container_name: cluster-stable-1
@@ -110,7 +110,7 @@ services:
       - "7479-7481:7479-7481"
     volumes:
       - "./cluster-stable/config:/redis/config"
-      - "${WORK_DIR}/cluster-stable/work:/redis/work"
+      - "${WORK_DIR}/cluster-stable/work:/redis/work:rw"
   #todo: migrate to CE image & test all modules test passed
   jedis-stack:
       image: redis/redis-stack-server:edge

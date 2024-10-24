@@ -525,13 +525,15 @@ mvn-release:
 	mvn release:prepare
 	mvn release:perform -DskipTests
 
-system-setup:
+install-gcc:
 	sudo apt install -y gcc g++
+
+system-setup: install-gcc
 	[ ! -e redis-git ] && git clone https://github.com/redis/redis.git --branch unstable --single-branch redis-git || true
 	$(MAKE) -C redis-git clean
 	$(MAKE) -C redis-git
 
-compile-module:
+compile-module: install-gcc
 	gcc -shared -o /tmp/testmodule.so -fPIC src/test/resources/testmodule.c
 
 

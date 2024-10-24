@@ -11,6 +11,7 @@ build/
 bin/
 tags
 .idea
+.run
 *.aof
 *.rdb
 redis-git

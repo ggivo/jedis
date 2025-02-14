@@ -334,10 +334,6 @@ public class UnifiedJedis implements JedisCommands, JedisBinaryCommands,
     this.commandObjects.setBroadcastAndRoundRobinConfig(this.broadcastAndRoundRobinConfig);
   }
 
-  public final JedisBroadcastReplies broadcastCommandDifferingReplies(CommandObject commandObject) {
-    return executor.broadcastCommandDifferingReplies(commandObject);
-  }
-
   public Cache getCache() {
     return cache;
   }
@@ -358,13 +354,13 @@ public class UnifiedJedis implements JedisCommands, JedisBinaryCommands,
     return checkAndBroadcastCommand(commandObjects.configSet(parameter, value));
   }
 
-  public final JedisBroadcastReplies info() {
-    return executor.broadcastCommandDifferingReplies(new CommandObject(
+  public  String info() {
+    return executor.executeCommand(new CommandObject<>(
         new CommandArguments(Protocol.Command.INFO), BuilderFactory.STRING));
   }
 
-  public final JedisBroadcastReplies info(String section) {
-    return executor.broadcastCommandDifferingReplies(new CommandObject(
+  public String info(String section) {
+    return executor.executeCommand(new CommandObject<>(
         new CommandArguments(Protocol.Command.INFO).add(section), BuilderFactory.STRING));
   }
 

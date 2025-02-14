@@ -39,6 +39,14 @@ public class ClusterCommandExecutor implements CommandExecutor {
     this.provider.close();
   }
 
+  /**
+   * Send command to all nodes in the cluster.
+   *
+   * Result is returned if all nodes return the same result.
+   * @param commandObject the command to send
+   * @return the result of the command if all nodes return the same result, otherwise throws an JedisBroadcastException
+   * @param <T> the type of the result
+   */
   @Override
   public final <T> T broadcastCommand(CommandObject<T> commandObject) {
     Map<String, ConnectionPool> connectionMap = provider.getConnectionMap();
@@ -72,19 +80,29 @@ public class ClusterCommandExecutor implements CommandExecutor {
     return reply;
   }
 
-  @Override
-  public final JedisBroadcastReplies broadcastCommandDifferingReplies(CommandObject commandObject) {
+  /**
+   * Send command to all nodes in the cluster.
+   *
+   * Returns map of replies from each node.
+   * If a node fails to respond or return an error result, the exception is immediately propagated and following nodes will not be contacted.
+   * @param commandObject the command to send
+   * @return the result of the command if all nodes return a result, otherwise throws an Exception
+   * @param <T> the type of the result
+   */
+  public final <T> JedisBroadcastReplies<T> broadcastCommandAllReplies(CommandObject<T> commandObject) {
     Map<String, ConnectionPool> connectionMap = provider.getConnectionMap();
 
-    JedisBroadcastReplies bcastReplies = new JedisBroadcastReplies(connectionMap.size());
+    JedisBroadcastReplies<T> bcastReplies = new JedisBroadcastReplies<>();
     for (Map.Entry<String, ConnectionPool> entry : connectionMap.entrySet()) {
       HostAndPort node = HostAndPort.from(entry.getKey());
       ConnectionPool pool = entry.getValue();
       try (Connection connection = pool.getResource()) {
-        Object aReply = execute(connection, commandObject);
+        T aReply = execute(connection, commandObject);
         bcastReplies.addReply(node, aReply);
-      } catch (Exception anError) {
-        bcastReplies.addReply(node, anError);
+      } catch (Exception e) {
+        // If we get an exception from one of the nodes,
+        // complete the operation exceptionally!
+        throw e;
       }
     }
     return bcastReplies;

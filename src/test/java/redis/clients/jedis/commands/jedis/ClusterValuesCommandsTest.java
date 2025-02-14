@@ -132,17 +132,17 @@ public class ClusterValuesCommandsTest extends ClusterJedisCommandsTestBase {
   }
 
   @Test
-  public void broadcastDifferentReplies() {
-    JedisBroadcastReplies infoReplies = cluster.info();
+  public void infoAllNodes() {
+    JedisBroadcastReplies<String> infoReplies = cluster.infoAllNodes();
     assertThat(infoReplies.getReplies(), Matchers.aMapWithSize(3));
     infoReplies.getReplies().values().forEach(infoValue -> {
-      assertThat((String) infoValue, Matchers.notNullValue());
+      assertThat(infoValue, Matchers.notNullValue());
     });
 
-    infoReplies = cluster.info("server");
+    infoReplies = cluster.infoAllNodes("server");
     assertThat(infoReplies.getReplies(), Matchers.aMapWithSize(3));
     infoReplies.getReplies().values().forEach(infoValue -> {
-      assertThat((String) infoValue, Matchers.notNullValue());
+      assertThat( infoValue, Matchers.notNullValue());
     });
   }
 

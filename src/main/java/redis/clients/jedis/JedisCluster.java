@@ -13,6 +13,7 @@ import redis.clients.jedis.providers.ClusterConnectionProvider;
 import redis.clients.jedis.csc.Cache;
 import redis.clients.jedis.csc.CacheConfig;
 import redis.clients.jedis.csc.CacheFactory;
+import redis.clients.jedis.util.JedisBroadcastReplies;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
 public class JedisCluster extends UnifiedJedis {
@@ -373,6 +374,25 @@ public class JedisCluster extends UnifiedJedis {
     }
   }
   // commands
+  public String info() {
+    return getExecutor().executeCommand(new CommandObject<>(
+        new ClusterCommandArguments(Protocol.Command.INFO), BuilderFactory.STRING));
+  }
+
+  public JedisBroadcastReplies<String> infoAllNodes() {
+    return getExecutor().broadcastCommandAllReplies(new CommandObject<>(
+        new ClusterCommandArguments(Protocol.Command.INFO), BuilderFactory.STRING));
+  }
+
+  public String info(String section) {
+    return getExecutor().executeCommand(new CommandObject<>(
+        new ClusterCommandArguments(Protocol.Command.INFO).add(section), BuilderFactory.STRING));
+  }
+
+  public JedisBroadcastReplies<String> infoAllNodes(String section) {
+    return getExecutor().broadcastCommandAllReplies(new CommandObject<>(
+        new ClusterCommandArguments(Protocol.Command.INFO).add(section), BuilderFactory.STRING));
+  }
 
   @Override
   public ClusterPipeline pipelined() {
@@ -394,5 +414,9 @@ public class JedisCluster extends UnifiedJedis {
       throw new UnsupportedOperationException("Support only execute to replica in ClusterCommandExecutor");
     }
     return ((ClusterCommandExecutor) executor).executeCommandToReplica(commandObject);
+  }
+
+  private ClusterCommandExecutor getExecutor() {
+    return (ClusterCommandExecutor) executor;
   }
 }

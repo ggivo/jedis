@@ -168,16 +168,4 @@ public class PooledMiscellaneousTest extends UnifiedJedisCommandsTestBase {
     assertEquals("ERR Library not found", error.getMessage());
   }
 
-  @Test
-  public void broadcastDifferentReplies() {
-    JedisBroadcastReplies infoReplies = jedis.info();
-    assertThat(infoReplies.getReplies(), Matchers.aMapWithSize(1));
-    Object infoValue = infoReplies.getReplies().values().stream().findFirst().get();
-    assertThat((String) infoValue, Matchers.notNullValue());
-
-    infoReplies = jedis.info("server");
-    assertThat(infoReplies.getReplies(), Matchers.aMapWithSize(1));
-    infoValue = infoReplies.getReplies().values().stream().findFirst().get();
-    assertThat((String) infoValue, Matchers.notNullValue());
-  }
 }

@@ -1,5 +1,7 @@
 package redis.clients.jedis.util;
 
+import redis.clients.jedis.HostAndPort;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -8,33 +10,16 @@ import java.util.Map;
  * The collection of replies where a command is broadcasted to multiple nodes, but the replies are expected to differ
  * even in ideal situation.
  */
-public class JedisBroadcastReplies {
+public class JedisBroadcastReplies<T> {
 
-  private static final Object DUMMY_OBJECT = new Object();
+  private final Map<HostAndPort, T> replies = new HashMap<>();
 
-  private final Map<Object, Object> replies;
-
-  public JedisBroadcastReplies() {
-    this(new HashMap<>());
-  }
-
-  public JedisBroadcastReplies(int size) {
-    this(new HashMap<>(size));
-  }
-
-  private JedisBroadcastReplies(Map<Object, Object> replies) {
-    this.replies = replies;
-  }
-
-  public void addReply(Object node, Object reply) {
+  public void addReply(HostAndPort node, T reply) {
     replies.put(node, reply);
   }
 
-  public Map<Object, Object> getReplies() {
+  public Map<Object, T> getReplies() {
     return Collections.unmodifiableMap(replies);
   }
 
-  public static JedisBroadcastReplies singleton(Object reply) {
-    return new JedisBroadcastReplies(Collections.singletonMap(DUMMY_OBJECT, reply));
-  }
 }

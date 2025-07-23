@@ -88,7 +88,7 @@ public class UnifiedJedisProactiveRebindTest {
             assertEquals(0, mockServer2.getConnectedClientCount());
 
             // 2. Send MOVING notification on server1 -> MOVING 30 localhost:port2
-            mockServer1.sendPushMessageToAll("MOVING", "30", server2Address.toString());
+            mockServer1.sendMovingPushToAll(30L, server2Address.toString());
 
             // 3. Perform PING command
             // This should trigger read of the MOVING notification and rebind to server2
@@ -131,7 +131,7 @@ public class UnifiedJedisProactiveRebindTest {
             assertEquals(0, mockServer2.getConnectedClientCount());
 
             // 2. Send MOVING notification on server1 -> MOVING 30 localhost:port2
-            mockServer1.sendPushMessageToAll("MOVING", "30", server2Address.toString());
+            mockServer1.sendMovingPushToAll(30L,  server2Address.toString());
 
             // 3. Active connection should be still usable until closed and returned to the pools
             assertTrue(activeConnection.ping());
@@ -174,7 +174,7 @@ public class UnifiedJedisProactiveRebindTest {
 
             // 2. Send MOVING notification on server1 -> MOVING 30 localhost:port2
             String server2Address = "localhost:" + mockServer2.getPort();
-            mockServer1.sendPushMessageToAll("MOVING", "30", server2Address);
+            mockServer1.sendMovingPushToAll( 30L, server2Address);
 
             // 3. perform a command on active connection to trigger rebind
             assertTrue(activeConnection.ping());
@@ -210,7 +210,7 @@ public class UnifiedJedisProactiveRebindTest {
             assertEquals(0, mockServer2.getConnectedClientCount());
 
             // 2. Send MOVING notification on server1 -> MOVING 30 localhost:port2
-            mockServer1.sendPushMessageToAll("MOVING", "30", server2Address.toString());
+            mockServer1.sendMovingPushToAll(30L, server2Address.toString());
 
             // 3. perform a command on active connection to trigger rebind
             assertTrue(activeConnection.ping());
@@ -245,7 +245,7 @@ public class UnifiedJedisProactiveRebindTest {
            assertEquals(0, mockServer2.getConnectedClientCount());
 
            // 2. Send MOVING notification on server1 -> MOVING 30 localhost:port2
-           mockServer1.sendPushMessageToAll("MOVING", "30", server2Address.toString());
+           mockServer1.sendMovingPushToAll(30L, server2Address.toString());
 
            // 3. Perform PING command
            // This should trigger read of the MOVING notification processing
@@ -258,6 +258,45 @@ public class UnifiedJedisProactiveRebindTest {
            assertEquals(2, mockServer1.getConnectedClientCount());
            assertEquals(0, mockServer2.getConnectedClientCount());
        }
+    }
+
+    @Test
+    public void testOriginalEndpointPreservationForRebindExpiry() throws InterruptedException {
+        // This test verifies that the original endpoint is preserved in the ConnectionFactory
+        // for potential fallback when rebind targets expire. Since we can't easily test
+        // actual expiration in unit tests, this test documents the expected behavior.
+
+        try (JedisPooled unifiedJedis = new JedisPooled(connectionPoolConfig, server1Address, clientConfig)) {
+
+            Connection connection1 = unifiedJedis.getPool().getResource();
+            // Verify initial connection to server1 (original endpoint)
+            assertEquals(1, mockServer1.getConnectedClientCount());
+            assertEquals(0, mockServer2.getConnectedClientCount());
+            assertEquals(server1Address, ConnectionTestHelper.getHostAndPort(connection1));
+
+            // 2. Send MOVING notification on server1 -> MOVING 1 localhost:port2
+            mockServer1.sendMovingPushToAll(1L, server2Address.toString());
+            assertTrue(connection1.ping());
+            assertEquals(server1Address, ConnectionTestHelper.getHostAndPort(connection1));
+            connection1.close();
+
+            //followup connection should be created against server2
+            Connection connection2 = unifiedJedis.getPool().getResource();
+            assertEquals(server2Address, ConnectionTestHelper.getHostAndPort(connection2));
+            connection2.close();
+
+            // 3. Wait for rebind target to expire
+            // after rebind target expiry, new connections should fallback to original endpoint
+            await().pollDelay(Duration.ofMillis(50)).timeout(Duration.ofSeconds(3))
+                .until(() -> {
+                    unifiedJedis.getPool().clear();
+                    try (Connection newConnection = unifiedJedis.getPool().getResource()) {
+                        return ConnectionTestHelper.getHostAndPort(newConnection)
+                            .equals(server1Address);
+                    }
+                });
+
+        }
     }
 
 }

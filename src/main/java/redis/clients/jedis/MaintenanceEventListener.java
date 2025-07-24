@@ -1,5 +1,6 @@
 package redis.clients.jedis;
 
+import java.time.Duration;
 
 public interface MaintenanceEventListener {
 
@@ -11,5 +12,5 @@ public interface MaintenanceEventListener {
 
   default void onFailedOver(){};
 
-  default void onRebind( HostAndPort target){};
+  default void onRebind( HostAndPort target, Duration rebindTimeout){};
 }

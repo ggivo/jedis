@@ -16,7 +16,6 @@ import redis.clients.jedis.authentication.AuthXEventListener;
 import redis.clients.jedis.csc.Cache;
 import redis.clients.jedis.csc.CacheConnection;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.jedis.util.Expirable;
 
 /**
  * PoolableObjectFactory custom impl.
@@ -59,6 +58,16 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
     this.clientSideCache = csCache;
     this.clientConfig = clientConfig;
 
+    if (clientConfig.isProactiveRebindEnabled()) {
+      if (!(jedisSocketFactory instanceof DefaultJedisSocketFactory)) {
+        throw new IllegalStateException("Rebind not supported for custom JedisSocketFactory implementations");
+      }
+      DefaultJedisSocketFactory factory = (DefaultJedisSocketFactory) jedisSocketFactory;
+      this.rebindAwareHostPortSupplier = wrapHostAndPortSupplier(factory);
+    } else {
+      this.rebindAwareHostPortSupplier = null;
+    }
+
     AuthXManager authXManager = clientConfig.getAuthXManager();
     if (authXManager == null) {
       this.objectMaker = connectionSupplier();
@@ -70,15 +79,7 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
       authXManager.start();
     }
 
-    if (clientConfig.isProactiveRebindEnabled()) {
-      if (!(jedisSocketFactory instanceof DefaultJedisSocketFactory)) {
-        throw new IllegalStateException("Rebind not supported for custom JedisSocketFactory implementations");
-      }
-      DefaultJedisSocketFactory factory = (DefaultJedisSocketFactory) jedisSocketFactory;
-      this.rebindAwareHostPortSupplier = wrapHostAndPortSupplier(factory);
-    } else {
-      this.rebindAwareHostPortSupplier = null;
-    }
+
   }
 
   private RebindAwareHostPortSupplier wrapHostAndPortSupplier(DefaultJedisSocketFactory factory) {
@@ -113,10 +114,18 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
   public PooledObject<Connection> makeObject() throws Exception {
     try {
       Connection jedis = objectMaker.get();
+      checkAndRelaxTimeouts(jedis);
+
       return new DefaultPooledObject<>(jedis);
     } catch (JedisException je) {
       logger.debug("Error while makeObject", je);
       throw je;
+    }
+  }
+
+  private void checkAndRelaxTimeouts(Connection conn) {
+    if (rebindAwareHostPortSupplier != null && rebindAwareHostPortSupplier.isRebindInProgress()) {
+      conn.relaxTimeouts(rebindAwareHostPortSupplier.getRebindExpirationTime());
     }
   }
 
@@ -167,32 +176,4 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
     }
   }
 
-  private static class RebindAwareHostPortSupplier implements Supplier<HostAndPort>, RebindAware {
-    private final Supplier<HostAndPort> delegatedSupplier;
-    private final HostAndPort initialHostAndPort;
-    private volatile Expirable<HostAndPort> rebindTarget;
-
-    public RebindAwareHostPortSupplier(HostAndPort initialHostAndPort,
-        Supplier<HostAndPort> hostAndPortSupplier) {
-      this.initialHostAndPort = initialHostAndPort;
-      this.delegatedSupplier = hostAndPortSupplier;
-    }
-
-    public void rebind(HostAndPort rebindTarget, Duration rebindTimeout) {
-      this.rebindTarget = new Expirable<>(rebindTarget, rebindTimeout);
-    }
-
-    public HostAndPort get() {
-      if (rebindTarget != null && rebindTarget.isValid()) {
-        return rebindTarget.getValue();
-      }
-
-      if (delegatedSupplier != null) {
-        return delegatedSupplier.get();
-      }
-
-      return initialHostAndPort;
-    }
-
-  }
 }

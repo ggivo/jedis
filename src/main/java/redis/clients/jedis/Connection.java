@@ -12,6 +12,7 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -50,6 +51,7 @@ public class Connection implements Closeable {
   private boolean relaxedTimeoutEnabled = false;
   private int relaxedTimeout = safeToInt(TimeoutOptions.DISABLED_TIMEOUT.toMillis());
   private int relaxedBlockingTimeout = safeToInt(TimeoutOptions.DISABLED_TIMEOUT.toMillis());
+  private Instant relaxedTimeoutExpiryTime;
   private int soTimeout = 0;
   private int infiniteSoTimeout = 0;
   private boolean broken = false;
@@ -236,6 +238,9 @@ public class Connection implements Closeable {
     final CommandArguments args = commandObject.getArguments();
     sendCommand(args);
     if (!args.isBlocking()) {
+      if (isRelaxedTimeoutActive()) {
+        checkRelaxedTimeoutExpiry();
+      }
       return commandObject.getBuilder().build(getOne());
     } else {
       try {
@@ -246,6 +251,12 @@ public class Connection implements Closeable {
         isBlocking = false;
         rollbackTimeout();
       }
+    }
+  }
+
+  private void checkRelaxedTimeoutExpiry() {
+    if (relaxedTimeoutExpiryTime != null  && Instant.now().isAfter(relaxedTimeoutExpiryTime)) {
+      disableRelaxedTimeout();
     }
   }
 
@@ -738,8 +749,22 @@ public class Connection implements Closeable {
 
   @Experimental
   public void relaxTimeouts() {
+    relaxTimeouts(null);
+  }
+
+  @Experimental
+  public void relaxTimeouts(Instant expiryTime) {
     if (!relaxedTimeoutEnabled) {
       return;
+    }
+
+    if (expiryTime != null){
+       if (!expiryTime.isBefore(Instant.now())) {
+         relaxedTimeoutExpiryTime = expiryTime;
+       } else {
+         // expiry time in the past, ignore
+         return;
+       }
     }
 
     if (!isRelaxed) {
@@ -759,6 +784,7 @@ public class Connection implements Closeable {
   public void disableRelaxedTimeout() {
     if (isRelaxed) {
       isRelaxed = false;
+      relaxedTimeoutExpiryTime = null;
       try {
         if (isConnected()) {
           socket.setSoTimeout(getDesiredTimeout());
@@ -768,6 +794,10 @@ public class Connection implements Closeable {
         throw new JedisConnectionException(ex);
       }
     }
+  }
+
+  Instant getRelaxedTimeoutExpiryTime() {
+    return relaxedTimeoutExpiryTime;
   }
 
   private static int safeToInt(long millis) {

@@ -135,12 +135,12 @@ public class TcpMockServer {
   }
 
   /**
-   * Send a MOVING push message according to RESP3 spec to all connected clients
-   * Format: >4\r\n+MOVING\r\n:<seq_number>\r\n:<time_s>\r\n+<new_name_or_ip>:<port>\r\n
+   * Send a MOVING push message according to RESP3 spec to all connected clients Format:
+   * >4\r\n+MOVING\r\n:<seq_number>\r\n:<time_s>\r\n+<new_name_or_ip>:<port>\r\n
    * @param expiry the timestamp in seconds as Long
    * @param targetHost the target host:port
    */
-  public void sendMovingPushToAll( Long expiry, String targetHost) {
+  public void sendMovingPushToAll(Long expiry, String targetHost) {
     sendPushMessageToAll("MOVING", expiry, targetHost);
   }
 

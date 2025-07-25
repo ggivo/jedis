@@ -5,6 +5,11 @@ import redis.clients.jedis.util.ReflectionTestUtils;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.SocketException;
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Helper class for testing Connection objects, providing access to internal state
@@ -35,4 +40,19 @@ public class ConnectionTestHelper {
         throw new RuntimeException("Unexpected socket address type: " + remoteAddress.getClass());
       }
   }
+
+  /**
+   * Extract actual socket timeout from the underlying socket connection.
+   *
+   * @param connection the connection to check
+   */
+  public static int socketTimeout(Connection connection) {
+      Socket socket = ReflectionTestUtils.getField(connection, "socket");
+    try {
+      return socket.getSoTimeout();
+    } catch (SocketException e) {
+      throw new RuntimeException("Could not get socket timeout",e);
+    }
+  }
+
 }

@@ -6,6 +6,7 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.function.Supplier;
 
 import redis.clients.jedis.annots.Experimental;
@@ -29,6 +30,7 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
   private final Supplier<Connection> objectMaker;
 
   private final AuthXEventListener authXEventListener;
+  private final RebindAwareHostPortSupplier rebindAwareHostPortSupplier;
 
   public ConnectionFactory(final HostAndPort hostAndPort) {
     this(hostAndPort, DefaultJedisClientConfig.builder().build(), null);
@@ -56,6 +58,16 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
     this.clientSideCache = csCache;
     this.clientConfig = clientConfig;
 
+    if (clientConfig.isProactiveRebindEnabled()) {
+      if (!(jedisSocketFactory instanceof DefaultJedisSocketFactory)) {
+        throw new IllegalStateException("Rebind not supported for custom JedisSocketFactory implementations");
+      }
+      DefaultJedisSocketFactory factory = (DefaultJedisSocketFactory) jedisSocketFactory;
+      this.rebindAwareHostPortSupplier = wrapHostAndPortSupplier(factory);
+    } else {
+      this.rebindAwareHostPortSupplier = null;
+    }
+
     AuthXManager authXManager = clientConfig.getAuthXManager();
     if (authXManager == null) {
       this.objectMaker = connectionSupplier();
@@ -66,6 +78,14 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
       this.authXEventListener = authXManager.getListener();
       authXManager.start();
     }
+
+
+  }
+
+  private RebindAwareHostPortSupplier wrapHostAndPortSupplier(DefaultJedisSocketFactory factory) {
+    RebindAwareHostPortSupplier hostPortSupplier =  new RebindAwareHostPortSupplier(factory.getHostAndPort(), factory.getHostAndPortSupplier());
+    factory.setHostAndPortSupplier(hostPortSupplier);
+    return  hostPortSupplier;
   }
 
   private Supplier<Connection> connectionSupplier() {
@@ -94,10 +114,18 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
   public PooledObject<Connection> makeObject() throws Exception {
     try {
       Connection jedis = objectMaker.get();
+      checkAndRelaxTimeouts(jedis);
+
       return new DefaultPooledObject<>(jedis);
     } catch (JedisException je) {
       logger.debug("Error while makeObject", je);
       throw je;
+    }
+  }
+
+  private void checkAndRelaxTimeouts(Connection conn) {
+    if (rebindAwareHostPortSupplier != null && rebindAwareHostPortSupplier.isRebindInProgress()) {
+      conn.relaxTimeouts(rebindAwareHostPortSupplier.getRebindExpirationTime());
     }
   }
 
@@ -141,17 +169,11 @@ public class ConnectionFactory implements PooledObjectFactory<Connection> , Rebi
     }
   }
 
-
   @Override
-  public void rebind(HostAndPort newHostAndPort) {
-    // TODO : extract interface from DefaultJedisSocketFactory so that we can support custom socket factories
-    if (!(jedisSocketFactory instanceof DefaultJedisSocketFactory)) {
-      throw new IllegalStateException("Rebind not supported for custom JedisSocketFactory implementations");
+  public void rebind(HostAndPort newHostAndPort, Duration rebindTimeout) {
+    if (rebindAwareHostPortSupplier != null) {
+      rebindAwareHostPortSupplier.rebind(newHostAndPort, rebindTimeout);
     }
-
-    DefaultJedisSocketFactory factory = (DefaultJedisSocketFactory) jedisSocketFactory;
-    logger.debug("Rebinding to {}", newHostAndPort);
-    factory.updateHostAndPort(newHostAndPort);
   }
 
 }

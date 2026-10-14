@@ -7,10 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.doAnswer;
 import static redis.clients.jedis.ConnectionTestHelper.getRelaxedBlockingSoTimeout;
 import static redis.clients.jedis.ConnectionTestHelper.getRelaxedSoTimeout;
 import static redis.clients.jedis.ConnectionTestHelper.isRelaxedTimeoutActive;
+import static redis.clients.jedis.util.server.CommandMatcher.command;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -18,6 +18,7 @@ import java.net.SocketException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.awaitility.Durations;
@@ -37,6 +38,7 @@ import redis.clients.jedis.MaintenanceNotificationsConfig;
 import redis.clients.jedis.RedisProtocol;
 import redis.clients.jedis.util.SafeEncoder;
 import redis.clients.jedis.util.server.CommandHandler;
+import redis.clients.jedis.util.server.Gate;
 import redis.clients.jedis.util.server.MaintenanceEventMessages;
 import redis.clients.jedis.util.server.RespResponse;
 import redis.clients.jedis.util.server.TcpMockServer;
@@ -199,22 +201,14 @@ public abstract class AbstractRelaxedTimeoutBehaviorTest {
     Socket socket = ConnectionTestHelper.getSocket(connection);
     assertEquals(SO_TIMEOUT_MS, socket.getSoTimeout());
 
-    // Three latches:
-    // - blpopSent: counts down when mockHandler sees BLPOP (so we know BLPOP is in flight).
-    // - blpopRelease: held by main thread; the mock answer waits on it before returning the
-    // reply, so the worker stays parked in the blocking read while we assert.
-    // - blpopFinished: counts down when executeCommand returns on the worker thread.
-    CountDownLatch blpopSent = new CountDownLatch(1);
-    CountDownLatch blpopRelease = new CountDownLatch(1);
-    CountDownLatch blpopFinished = new CountDownLatch(1);
-    doAnswer(invocation -> {
-      blpopSent.countDown();
-      blpopRelease.await();
-      return RespResponse.arrayOfBulkStrings("popped-item");
-    }).when(mockHandler).handleCommand(argThat(args -> {
+    // the BLPOP reply is held at a gate so the worker stays parked in the blocking read while we
+    // assert; blpopFinished counts down when executeCommand returns on the worker thread
+    Mockito.when(mockHandler.handleCommand(argThat(args -> {
       String cmd = SafeEncoder.encode(args.getCommand().getRaw());
       return "BLPOP".equalsIgnoreCase(cmd);
-    }), anyString());
+    }), anyString())).thenReturn(RespResponse.arrayOfBulkStrings("popped-item"));
+    Gate blpop = mockServer.gate(command("BLPOP"));
+    CountDownLatch blpopFinished = new CountDownLatch(1);
 
     mockServer.sendPushMessageToAll(
       MaintenanceEventMessages.migrating(1, 10, Collections.singletonList("1")));
@@ -225,7 +219,7 @@ public abstract class AbstractRelaxedTimeoutBehaviorTest {
     });
     t1.start();
 
-    blpopSent.await();
+    assertTrue(blpop.awaitEntered(5, TimeUnit.SECONDS));
     // BLPOP is now parked on the mock side; worker is reading. The MIGRATING push frame is
     // ahead of the (not-yet-sent) reply in the client buffer, so the worker processes it.
     await().atMost(Duration.ofSeconds(2)).pollInterval(Duration.ofMillis(5))
@@ -234,7 +228,7 @@ public abstract class AbstractRelaxedTimeoutBehaviorTest {
       "Socket timeout should be relaxed blocking timeout during blocking command");
 
     // Let the mock return the BLPOP reply; worker can now complete.
-    blpopRelease.countDown();
+    blpop.release();
     blpopFinished.await();
     assertTrue(isRelaxedTimeoutActive(connection),
       "Relaxed timeout should still be active after blocking command");

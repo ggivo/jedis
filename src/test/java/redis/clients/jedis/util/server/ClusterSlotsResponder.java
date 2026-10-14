@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import redis.clients.jedis.CommandArguments;
@@ -19,9 +17,9 @@ import redis.clients.jedis.util.SafeEncoder;
  * {@link CommandHandler} turning one {@link TcpMockServer} into a Redis Cluster node: answers
  * {@code CLUSTER SLOTS} from the shared {@link MockClusterTopology}, redirects keyed commands for
  * slots it does not own with {@code -MOVED}, keeps a tiny key/value store for {@code SET}/{@code
- * GET}, serves {@code BLPOP} (optionally delayed) and the sharded pub/sub replies, and records
- * every command it saw. Knobs let a test reject the maintenance handshake, slow down {@code HELLO},
- * or hold {@code CLUSTER SLOTS} replies at a gate. Everything else falls through to the server's
+ * GET}, serves {@code BLPOP} and the sharded pub/sub replies, and records every command it saw. One
+ * knob rejects the maintenance handshake; delaying or holding a reply is
+ * {@link TcpMockServer#gate(CommandMatcher)}. Everything else falls through to the server's
  * built-in replies.
  */
 public final class ClusterSlotsResponder implements CommandHandler {
@@ -35,10 +33,6 @@ public final class ClusterSlotsResponder implements CommandHandler {
   private final Map<String, String> store = new ConcurrentHashMap<>();
 
   private volatile boolean rejectMaintNotifications;
-  private volatile long helloDelayMillis;
-  private volatile long blockingReplyDelayMillis;
-  private volatile CountDownLatch clusterSlotsEntered;
-  private volatile CountDownLatch clusterSlotsGate;
   private volatile String subscribedChannel;
 
   public ClusterSlotsResponder(MockClusterTopology topology, HostAndPort self) {
@@ -53,29 +47,6 @@ public final class ClusterSlotsResponder implements CommandHandler {
    */
   public ClusterSlotsResponder rejectMaintNotifications(boolean reject) {
     this.rejectMaintNotifications = reject;
-    return this;
-  }
-
-  /** Delay every {@code HELLO} reply, to exercise handshake read timeouts. */
-  public ClusterSlotsResponder helloDelayMillis(long millis) {
-    this.helloDelayMillis = millis;
-    return this;
-  }
-
-  /** Delay every {@code BLPOP} reply, to exercise blocking read timeouts. */
-  public ClusterSlotsResponder blockingReplyDelayMillis(long millis) {
-    this.blockingReplyDelayMillis = millis;
-    return this;
-  }
-
-  /**
-   * Holds every {@code CLUSTER SLOTS} reply at {@code release}. The reply is snapshotted when the
-   * command arrives (before waiting), so a held refresh answers with the topology as of its
-   * arrival; {@code entered} is counted down on arrival.
-   */
-  public ClusterSlotsResponder gateClusterSlots(CountDownLatch entered, CountDownLatch release) {
-    this.clusterSlotsEntered = entered;
-    this.clusterSlotsGate = release;
     return this;
   }
 
@@ -131,9 +102,6 @@ public final class ClusterSlotsResponder implements CommandHandler {
     commands.add(tokens);
     String command = tokens.get(0).toUpperCase();
     switch (command) {
-      case "HELLO":
-        sleep(helloDelayMillis);
-        return null;
       case "CLIENT":
         if (rejectMaintNotifications && tokens.size() > 1
             && "MAINT_NOTIFICATIONS".equalsIgnoreCase(tokens.get(1))) {
@@ -159,7 +127,6 @@ public final class ClusterSlotsResponder implements CommandHandler {
         if (moved != null) {
           return moved;
         }
-        sleep(blockingReplyDelayMillis);
         return RespResponse.arrayOfBulkStrings(tokens.get(1), "popped");
       }
       case "SSUBSCRIBE":
@@ -174,21 +141,8 @@ public final class ClusterSlotsResponder implements CommandHandler {
   }
 
   private String clusterSlots() {
-    List<Object> reply = topology.clusterSlotsReply(); // as of arrival, even if held at the gate
     clusterSlotsCalls.incrementAndGet();
-    CountDownLatch entered = clusterSlotsEntered;
-    CountDownLatch gate = clusterSlotsGate;
-    if (entered != null) {
-      entered.countDown();
-    }
-    if (gate != null) {
-      try {
-        gate.await(10, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    return RespResponse.array(reply);
+    return RespResponse.array(topology.clusterSlotsReply());
   }
 
   /** {@code -MOVED slot host:port} when another node owns the key's slot, else {@code null}. */
@@ -201,19 +155,4 @@ public final class ClusterSlotsResponder implements CommandHandler {
     return RespResponse.error("MOVED " + slot + " " + owner.getHost() + ":" + owner.getPort());
   }
 
-  private static void sleep(long millis) {
-    if (millis <= 0) {
-      return;
-    }
-    long deadline = System.currentTimeMillis() + millis;
-    long remaining;
-    while ((remaining = deadline - System.currentTimeMillis()) > 0) {
-      try {
-        Thread.sleep(remaining);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return;
-      }
-    }
-  }
 }

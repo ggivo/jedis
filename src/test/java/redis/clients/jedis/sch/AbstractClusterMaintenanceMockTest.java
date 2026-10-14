@@ -46,7 +46,7 @@ import redis.clients.jedis.util.server.TcpMockServer;
 public abstract class AbstractClusterMaintenanceMockTest {
 
   protected static final int SO_TIMEOUT_MS = 2000;
-  protected static final int BLOCKING_SO_TIMEOUT_MS = 1000;
+  protected static final int BLOCKING_SO_TIMEOUT_MS = 300;
   protected static final int RELAXED_TIMEOUT_MS = 10_000;
   protected static final int RELAXED_BLOCKING_TIMEOUT_MS = 4_000;
 

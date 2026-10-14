@@ -7,11 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static redis.clients.jedis.ConnectionTestHelper.hasClusterMaintenanceController;
 import static redis.clients.jedis.ConnectionTestHelper.hasPoolRelaxOverlay;
 import static redis.clients.jedis.ConnectionTestHelper.isListenerOfPoolController;
+import static redis.clients.jedis.util.server.CommandMatcher.command;
 
 import java.net.SocketException;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -24,6 +24,7 @@ import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.MaintenanceNotificationsConfig.Mode;
 import redis.clients.jedis.csc.CacheConfig;
 import redis.clients.jedis.util.server.ClusterSlotsResponder;
+import redis.clients.jedis.util.server.Gate;
 import redis.clients.jedis.util.server.MaintenanceEventMessages;
 
 /**
@@ -179,12 +180,12 @@ public class ClusterSlotMigrationMockTest extends AbstractClusterMaintenanceMock
   @Test
   public void deltaArrivingDuringARefreshIsAppliedAfterItAndRelaxesMeanwhile() throws Exception {
     openDefaultClient();
-    CountDownLatch entered = new CountDownLatch(1);
-    CountDownLatch release = new CountDownLatch(1);
-    handlerA.gateClusterSlots(entered, release);
+    // the reply is computed on arrival and held: the refresh answers with the pre-move table
+    Gate refreshGate = serverA.gate(command("CLUSTER", "SLOTS"));
     Thread refresh = new Thread(client::refreshClusterTopology, "refresh");
     refresh.start();
-    assertTrue(entered.await(5, TimeUnit.SECONDS), "the refresh is parked mid-query on A");
+    assertTrue(refreshGate.awaitEntered(5, TimeUnit.SECONDS),
+      "the refresh is parked mid-query on A");
 
     try {
       topology.assign(A_FROM, A_TO, nodeB);
@@ -196,7 +197,7 @@ public class ClusterSlotMigrationMockTest extends AbstractClusterMaintenanceMock
       }
       assertTrue(hasNode(nodeA), "not applied yet: A's pool is still there");
     } finally {
-      release.countDown();
+      refreshGate.release();
     }
     refresh.join(5000);
     assertFalse(refresh.isAlive());

@@ -10,7 +10,9 @@ import static redis.clients.jedis.ConnectionTestHelper.hasMaintenanceController;
 import static redis.clients.jedis.ConnectionTestHelper.hasMaintenanceEventConsumer;
 import static redis.clients.jedis.ConnectionTestHelper.hasPoolRelaxOverlay;
 import static redis.clients.jedis.ConnectionTestHelper.isListenerOfPoolController;
+import static redis.clients.jedis.util.server.CommandMatcher.command;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -112,8 +114,9 @@ public class ClusterMaintenanceHandshakeMockTest extends AbstractClusterMaintena
   /** Case A6, section A, in ClusterMaintenanceIT.md. */
   @Test
   public void connectionOpenedDuringAnOpenWindowRelaxesItsHandshake() {
-    int soTimeoutMs = 250;
-    handlerB.helloDelayMillis(900); // slower than the socket timeout, faster than the relaxed one
+    int soTimeoutMs = 200;
+    // 3x the socket timeout, well below the relaxed one
+    serverB.delay(command("HELLO"), Duration.ofMillis(3 * soTimeoutMs));
     client = clientBuilder(clientConfig(RedisProtocol.RESP3, soTimeoutMs), maintConfig(Mode.AUTO))
         .maxAttempts(1).build();
 

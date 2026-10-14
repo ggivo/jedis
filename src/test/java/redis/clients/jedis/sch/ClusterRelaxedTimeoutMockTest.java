@@ -4,11 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static redis.clients.jedis.util.server.CommandMatcher.keyed;
 
 import java.net.SocketException;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -125,15 +125,15 @@ public class ClusterRelaxedTimeoutMockTest extends AbstractClusterMaintenanceMoc
   /** Case B6, section B, in ClusterMaintenanceIT.md. */
   @Test
   public void relaxedBlockingTimeoutAppliesDuringABlockingCommand() {
-    handlerA.blockingReplyDelayMillis(2000); // > 1000 configured blocking, < 4000 relaxed blocking
-    client = clientBuilder(defaultClientConfig(), maintConfig(Mode.AUTO)).maxAttempts(1).build();
     String key = keyOnA();
+    // 2x the configured blocking timeout, well below the relaxed one
+    serverA.delay(keyed("BLPOP", key), Duration.ofMillis(2 * BLOCKING_SO_TIMEOUT_MS));
+    client = clientBuilder(defaultClientConfig(), maintConfig(Mode.AUTO)).maxAttempts(1).build();
     deliver(serverA, A_FROM, migrating(1L, "0-100"));
 
-    List<String> popped = client.blpop(0, key);
-    assertEquals(Arrays.asList(key, "popped"), popped);
+    assertEquals(Arrays.asList(key, "popped"), client.blpop(0, key));
 
-    // window closed: the same server delay now exceeds the configured blocking timeout
+    // window closed: the same delay now exceeds the configured blocking timeout
     deliver(serverA, A_FROM, neutralCloser(2L));
     assertThrows(JedisClusterOperationException.class, () -> client.blpop(0, key));
   }

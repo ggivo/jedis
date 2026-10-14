@@ -14,10 +14,13 @@ import redis.clients.jedis.util.SafeEncoder;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,6 +37,9 @@ public class TcpMockServer {
   private ServerSocket serverSocket;
   private int port;
   private CommandHandler commandHandler;
+
+  private static final Duration DEFAULT_MAX_HOLD = Duration.ofSeconds(10);
+  private final List<Gate> gates = new CopyOnWriteArrayList<>();
 
   /** Protocol assumed for a connection that never sent HELLO. Real Redis defaults to RESP2. */
   private volatile RedisProtocol defaultProtocol = RedisProtocol.RESP2;
@@ -81,6 +87,33 @@ public class TcpMockServer {
       serverSocket.close();
     }
     executor.shutdownNow();
+    gates.clear();
+  }
+
+  /**
+   * Holds the replies of commands matching {@code matcher} until the returned gate is released,
+   * bounded by 10 seconds. The first unreleased matching gate wins; gates never chain.
+   */
+  public Gate gate(CommandMatcher matcher) {
+    return gate(matcher, DEFAULT_MAX_HOLD);
+  }
+
+  /** As {@link #gate(CommandMatcher)} with an explicit bound on how long a reply may be held. */
+  public Gate gate(CommandMatcher matcher, Duration maxHold) {
+    Gate gate = new Gate(matcher, maxHold, gates);
+    gates.add(gate);
+    return gate;
+  }
+
+  /** Delays the replies of matching commands by {@code delay}: a gate that nothing releases. */
+  public Gate delay(CommandMatcher matcher, Duration delay) {
+    return gate(matcher, delay);
+  }
+
+  private void releaseGates() {
+    for (Gate gate : gates) {
+      gate.release();
+    }
   }
 
   /**
@@ -216,6 +249,7 @@ public class TcpMockServer {
    * Close all active client connections
    */
   private void closeAllActiveConnections() {
+    releaseGates(); // parked handlers must not outlive their clients
     // Create a copy of the values to avoid ConcurrentModificationException
     java.util.List<ClientHandler> clientsToClose = new java.util.ArrayList<>(
         connectedClients.values());
@@ -490,10 +524,38 @@ public class TcpMockServer {
       }
 
       if (response != null) {
+        if (!holdIfGated(commandArgs)) {
+          return; // interrupted while parked: the connection is closing, nothing to write
+        }
         writeResponse(response);
       } else {
         throw new RuntimeException("Unknown command: " + commandArgs.getCommand());
       }
+    }
+
+    /**
+     * Parks at the first unreleased gate matching the command, after its reply was computed.
+     * Returns false when interrupted, i.e. the server is stopping.
+     */
+    private boolean holdIfGated(CommandArguments commandArgs) {
+      if (gates.isEmpty()) {
+        return true;
+      }
+      List<String> tokens = new ArrayList<>();
+      commandArgs.forEach(arg -> tokens.add(SafeEncoder.encode(arg.getRaw())));
+      for (Gate gate : gates) {
+        if (!gate.isReleased() && gate.matches(tokens)) {
+          try {
+            gate.hold();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            connected = false;
+            return false;
+          }
+          return true;
+        }
+      }
+      return true;
     }
 
     /**

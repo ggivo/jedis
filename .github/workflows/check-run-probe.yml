@@ -1,0 +1,36 @@
+name: Check run update probe
+on:
+  push:
+    branches: ['probe/**']
+permissions:
+  checks: write
+  actions: read
+  contents: read
+jobs:
+  probe:
+    name: Build and Test (probe)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find this job's check run
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+                 --jq '.jobs[] | select(.name == "Build and Test (probe)") | .check_run_url')
+          echo "check run: $url"
+          echo "id=${url##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Update this job's own check run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.find.outputs.id }}
+        run: |
+          set +e
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/check-runs/$ID" \
+            -f 'output[title]=All 5 390 tests pass, 2 975 skipped in 5m 51s' \
+            -f 'output[summary]=PROBE summary written by the job itself' \
+            -f 'output[text]=PROBE text' > patch.json 2> patch.err
+          echo "PATCH exit=$?"; cat patch.err; jq '{name, status, title: .output.title, summary: .output.summary, app: .app.slug}' patch.json 2>/dev/null
+          echo "--- read back during the job:"
+          gh api "repos/$GITHUB_REPOSITORY/check-runs/$ID" --jq '{name, status, title: .output.title, summary: .output.summary, app: .app.slug}'

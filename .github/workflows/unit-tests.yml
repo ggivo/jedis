@@ -68,3 +68,4 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+# coverage baseline marker for ggivo/jedis before/after runs
